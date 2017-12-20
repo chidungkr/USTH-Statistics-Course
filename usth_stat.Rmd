@@ -1,0 +1,254 @@
+---
+title: "Data Analysis Course at USTH (Section: Statistics)"
+subtitle: "Biostatistics"
+author: "Nguyen Chi Dung"
+date: "`r Sys.Date()`"
+output:
+  tufte::tufte_html: default
+  tufte::tufte_handout:
+    citation_package: natbib
+    latex_engine: xelatex
+  tufte::tufte_book:
+    citation_package: natbib
+    latex_engine: xelatex
+bibliography: skeleton.bib
+link-citations: yes
+---
+
+```{r setup, include=FALSE}
+library(tufte)
+# invalidate cache when the tufte version changes
+knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'), warning = FALSE, message = FALSE)
+options(htmltools.dir.version = FALSE)
+```
+
+# Giới thiệu
+
+```{r}
+
+
+#==============================================
+#    Commonly Used Statistics in Research
+#==============================================
+
+#------------------
+#     1. Mean
+#------------------
+
+# Function for calculating mean: 
+
+tinh_mean <- function(x) {
+  n <- length(x)
+  tong <- sum(x)
+  tb <- tong / n
+  return(tb)
+}
+
+# Testing: 
+
+x <- c(1, 2, 4, 1)
+tinh_mean(x) # self-written function
+mean(x) # R base function. 
+
+# Explanation: 
+
+n <- length(x)
+n
+tong <- sum(x)
+tong
+tb <- tong / n
+tb
+
+#---------------------------------------------------
+#  Standard Deviation
+#  https://en.wikipedia.org/wiki/Standard_deviation
+#---------------------------------------------------
+
+# Function for calculating SD: 
+
+lech_chuan <- function(x) {
+  tb <- mean(x)
+  ts <- sum((x - tb)^2)
+  ms <- length(x) - 1
+  lc <- sqrt(ts / ms)
+  return(lc)
+}
+
+# Testing: 
+
+lech_chuan(x) # Our Function
+sd(x) # R base Function
+
+#------------------------------------
+#   Skewness
+#   https://en.wikipedia.org/wiki/Skewness 
+#------------------------------------
+
+# Function for calculating Skewness: 
+
+my_skew <- function(x) {
+  # Calculating m: 
+  tb <- mean(x)
+  u <- (x - tb)^3
+  m <- mean(u)
+  # Calculating s: 
+  s <- sd(x)
+  # Final step: 
+  b <- m / s^3
+  return(b)
+}
+
+# Testing: 
+my_skew(x) # Our function. 
+
+library(psych)
+skew(x) # A psych's function.  
+
+#------------------------------------------------------------------
+#  Kurtosis
+#  http://www.itl.nist.gov/div898/handbook/eda/section3/eda35b.htm
+#------------------------------------------------------------------
+
+# A function for calculating kurtosis: 
+
+my_kurt <- function(x) {
+  n <- length(x)
+  x <- x - mean(x)
+  r <- n*sum(x^4)/(sum(x^2)^2)
+  y <-  r*(1 - 1/n)^2 - 3
+  return(y)
+}
+
+
+# Testing: 
+my_kurt(x) # Own Function. 
+kurtosi(x) # A psych's function. 
+
+
+#----------------------------------------------------------------------
+#   A case study:  Bootstrap Method
+#   https://link.springer.com/article/10.2165/00019053-199813050-00002
+#----------------------------------------------------------------------
+
+# Load data: 
+path <- dir("F:/usth/data", full.names = TRUE)
+pima_small <- read.csv(path[4])
+
+# Inspect data: 
+library(tidyverse)
+pima_small %>% dim()
+
+# Calculate correlation: 
+cor(pima_small$bmi, pima_small$glucose)
+
+# Results from some samples: 
+
+s1 <- pima_small %>% sample_n(100)
+cor(s1$bmi, s1$glucose)
+
+s2 <- pima_small %>% sample_n(100)
+cor(s2$bmi, s2$glucose)
+
+# A function for calculating correlation: 
+
+my_cor <- function(pima_small, n_sample) {
+  d <- pima_small %>% sample_n(n_sample)
+  tuong_quan <- cor(d$bmi, d$glucose)
+  return(tuong_quan)
+}
+
+# Testing: 
+
+my_cor(pima_small, 100)
+
+
+# A function for calculating correlation based on the Bootstrap Method:  
+
+my_cor_boot <- function(pima_small) {
+  u <- pima_small %>% sample_n(nrow(pima_small), replace = TRUE)
+  tq <- cor(u$bmi, u$glucose)
+  return(tq)
+}
+
+# Testing: 
+
+my_cor_boot(pima_small)
+my_cor_boot(pima_small)
+
+
+
+cor_100 <- c()
+for (i in 1:10000) {
+  kq <- my_cor_boot(pima_small)
+  cor_100 <- c(cor_100, kq)
+}
+
+cor_100 %>% head()
+cor_100 %>% length()
+cor_100 %>% hist()
+cor_100 %>% summary()
+
+
+my_boot_cor_N <- function(N) {
+  kq <- c()
+  for (i in 1:N) {
+    set.seed(i)
+    k <- my_cor_boot(pima_small)
+    kq <- c(kq, k)
+  }
+  return(kq)
+}
+
+# Visualization: 
+my_df <- data.frame(Correlation = my_boot_cor_N(5000))
+
+my_df %>% 
+  ggplot(aes(Correlation)) + 
+  geom_histogram(fill = "blue", alpha = 0.4) + 
+  geom_vline(xintercept = mean(my_df$Correlation), color = "red") + 
+  theme_minimal()
+
+my_df %>% 
+  ggplot(aes(Correlation)) + 
+  geom_density(fill = "red", color = "red", alpha = 0.4) + 
+  geom_histogram(aes(y = ..density..), fill = "blue", color = "blue", alpha = 0.4) + 
+  geom_vline(xintercept = mean(my_df$Correlation), color = "yellow") + 
+  theme_minimal()
+  
+
+# Some basic statistics: 
+my_df %>% summary()
+
+my_skew(my_df$Correlation)
+my_kurt(my_df$Correlation)
+
+# Shapiro Test for Normality: 
+shapiro.test(my_df$Correlation)
+
+# JB Test for Normality: 
+library(fBasics)
+jarqueberaTest(my_df$Correlation)
+# ?fBasics
+
+#========================
+#        Normality
+#========================
+
+head(pima_small)
+
+pima_small %>% 
+  select(-test) %>% 
+  gather() %>% 
+  ggplot(aes(value)) + 
+  geom_density(fill = "red", color = "red", alpha = 0.4) + 
+  geom_histogram(aes(y = ..density..), fill = "blue", color = "blue", alpha = 0.4) + 
+  theme_minimal() + 
+  facet_wrap(~ key, scales = "free", ncol = 2, nrow = 4)
+```
+
+
+
+```{r bib, include=FALSE}
+# create a bib file for the R packages used in this document
+knitr::write_bib(c('base', 'rmarkdown'), file = 'skeleton.bib')
+```
